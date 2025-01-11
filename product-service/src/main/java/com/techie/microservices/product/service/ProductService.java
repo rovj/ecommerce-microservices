@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @Slf4j
@@ -23,30 +24,46 @@ public class ProductService {
     }
 
     public ProductResponse createProduct(ProductRequest productRequest){
-        List<Product> list = this.productRepository.findAll().stream().toList();
-        for(Product product : list){
-            if(product.getSkuCode().equals(productRequest.skuCode())){
-                product.setDescription(productRequest.description());
-                product.setName(productRequest.name());
-                product.setPrice(productRequest.price());
-                productRepository.save(product);
-                return new ProductResponse(product.getId(),product.getName(),product.getDescription(),product.getPrice(),product.getSkuCode());
-            }
+        Optional<Product> existingProduct = productRepository.findAll().stream()
+                .filter(product -> product.getSkuCode().equals(productRequest.skuCode()))
+                .findFirst();
+
+        Product product;
+
+        if (existingProduct.isPresent()) {
+            // Update the existing product
+            product = existingProduct.get();
+            product.setDescription(productRequest.description());
+            product.setName(productRequest.name());
+            product.setPrice(productRequest.price());
+            log.info("Product updated successfully");
+        } else {
+            // Create a new product
+            product = Product.builder()
+                    .name(productRequest.name())
+                    .description(productRequest.description())
+                    .price(productRequest.price())
+                    .skuCode(productRequest.skuCode())
+                    .build();
+            log.info("Product created successfully");
         }
-        Product product = Product.builder().name(productRequest.name())
-                                           .description(productRequest.description())
-                                           .price(productRequest.price())
-                                           .skuCode(productRequest.skuCode())
-                                           .build();
+
+        // Save the product and return the response
         productRepository.save(product);
-        log.info("Product created successfully");
-        return new ProductResponse(product.getId(),product.getName(),product.getDescription(),product.getPrice(),product.getSkuCode());
+        return new ProductResponse(
+                product.getId(),
+                product.getName(),
+                product.getDescription(),
+                product.getPrice(),
+                product.getSkuCode()
+        );
+
     }
 
     public List<ProductResponse> getProducts(){
         return productRepository.findAll().stream()
-                                          .map(product -> new ProductResponse(product.getId(), product.getName(),product.getDescription(),product.getPrice(),product.getSkuCode()))
-                                          .toList();
+                .map(product -> new ProductResponse(product.getId(), product.getName(),product.getDescription(),product.getPrice(),product.getSkuCode()))
+                .toList();
     }
 
     @Transactional
